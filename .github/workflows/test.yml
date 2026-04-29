@@ -1,0 +1,83 @@
+name: tests
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Inferno's hosted Linux build only supports i386, so we run all build
+      # and test steps inside a 32-bit container.  binfmt + qemu-user makes
+      # i386 binaries runnable on amd64 GitHub runners.
+      - name: enable i386 emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: i386
+
+      - uses: docker/setup-buildx-action@v3
+
+      # cache the Inferno toolchain image — building it from scratch takes
+      # several minutes, but the cache hit lets the test job start in seconds.
+      - name: build (or restore) inferno docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          tags: llama-inferno:ci
+          load: true
+          platforms: linux/386
+          cache-from: type=gha,scope=inferno
+          cache-to: type=gha,scope=inferno,mode=max
+
+      - name: cache test fixtures (model + tokenizer)
+        id: cache-data
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: tinyllamas-stories15M-tokenizer-v1
+
+      - name: fetch test fixtures
+        if: steps.cache-data.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p data
+          wget -q -O data/tokenizer.bin \
+            https://github.com/karpathy/llama2.c/raw/master/tokenizer.bin
+          wget -q -O data/stories15M.bin \
+            https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
+
+      - name: fetch karpathy reference run.c
+        run: |
+          mkdir -p tests/reference
+          wget -q -O tests/reference/karpathy_run.c \
+            https://raw.githubusercontent.com/karpathy/llama2.c/master/run.c
+
+      - name: build and run all tests inside the inferno container
+        run: |
+          docker run --rm --platform linux/386 \
+              -v "$PWD:/work" -w /work \
+              llama-inferno:ci \
+              sh -c '
+                set -eu
+                export INFERNO=/inferno
+                export PATH=$INFERNO/Linux/386/bin:$PATH
+                ./scripts/build.sh
+                # build the karpathy reference inside the container so it
+                # uses the same libc as everything else
+                cc -O2 -o tests/reference/karpathy_run \
+                    tests/reference/karpathy_run.c -lm
+                make -s -C tests/reference all
+                ./scripts/run-tests.sh
+              '
+
+      - name: upload test outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-outputs
+          path: build/tests

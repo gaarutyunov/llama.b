@@ -1,0 +1,17 @@
+<../../mkconfig
+
+TARG=\
+	llama.dis\
+
+MODULES=\
+	sys.m\
+	math.m\
+	llama.m\
+
+SYSMODULES=$MODULES
+
+DISBIN=$ROOT/dis/lib
+
+<$ROOT/mkfiles/mkdis
+
+llama.dis: llama.b $LLAMAINC/llama.m

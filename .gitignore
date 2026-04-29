@@ -1,0 +1,12 @@
+build/
+data/
+*.dis
+*.sbl
+tests/reference/karpathy_run
+tests/reference/karpathy_run.c
+tests/reference/ref_rmsnorm
+tests/reference/ref_softmax
+tests/reference/ref_matmul
+tests/reference/ref_rng
+tests/reference/ref_model_loading
+*.o

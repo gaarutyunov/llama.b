@@ -1,0 +1,19 @@
+<../../mkconfig
+
+TARG=\
+	run.dis\
+
+MODULES=\
+	sys.m\
+	draw.m\
+	llama.m\
+
+SYSMODULES=$MODULES
+
+DIRS=\
+	llamatests\
+
+DISBIN=$ROOT/dis
+
+<$ROOT/mkfiles/mkdis
+<$ROOT/mkfiles/mksubdirs

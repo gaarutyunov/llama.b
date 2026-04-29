@@ -1,0 +1,19 @@
+<../../../mkconfig
+
+TARG=\
+	test_rmsnorm.dis\
+	test_softmax.dis\
+	test_matmul.dis\
+	test_rng.dis\
+	test_model_loading.dis\
+
+MODULES=\
+	sys.m\
+	draw.m\
+	llama.m\
+
+SYSMODULES=$MODULES
+
+DISBIN=$ROOT/dis/llamatests
+
+<$ROOT/mkfiles/mkdis
