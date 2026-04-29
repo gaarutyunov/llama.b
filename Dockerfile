@@ -1,16 +1,15 @@
 # Build environment for the Inferno port of llama2.c.
 #
-# Inferno's hosted Linux build only ships an i386 mkfile, so we use
-# ubuntu i386 as the base image (this works on amd64 hosts via QEMU
-# user-mode binfmt).  We pin to a stable ubuntu tag to keep CI cache
-# behaviour predictable.
-FROM i386/ubuntu:jammy
+# Inferno's hosted Linux build only ships an i386 mkfile, so we use a
+# 32-bit base image (this works on amd64 hosts via QEMU user-mode binfmt).
+# Ubuntu dropped i386 images after 18.04, so we use Debian's i386 image
+# which is still actively maintained.
+FROM i386/debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get -y update && apt-get install -y \
+RUN apt-get -y update && apt-get install -y --no-install-recommends \
         libx11-dev libxext-dev libc6-dev gcc make ca-certificates git wget \
-        python3 python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
 ENV INFERNO=/inferno
