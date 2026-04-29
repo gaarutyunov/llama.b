@@ -14,8 +14,8 @@ RUN apt-get -y update && apt-get install -y --no-install-recommends \
 
 ENV INFERNO=/inferno
 ARG INFERNO_REV=master
-RUN git clone https://github.com/inferno-os/inferno-os.git $INFERNO \
- && (cd $INFERNO && git checkout $INFERNO_REV)
+RUN git clone --recurse-submodules https://github.com/inferno-os/inferno-os.git $INFERNO \
+ && (cd $INFERNO && git checkout $INFERNO_REV && git submodule update --init --recursive)
 
 WORKDIR $INFERNO
 
