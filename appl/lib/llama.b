@@ -81,7 +81,7 @@ rmsnorm(o, x, weight: array of real, size: int)
 	ss /= real size;
 	ss += 1.0e-5;
 	ss = 1.0 / math->sqrt(ss);
-	for(j := 0; j < size; j++)
+	for(j = 0; j < size; j++)
 		o[j] = weight[j] * (ss * x[j]);
 }
 
@@ -93,11 +93,11 @@ softmax(x: array of real, off, size: int)
 		if(x[off+i] > max_val)
 			max_val = x[off+i];
 	sum := 0.0;
-	for(i := 0; i < size; i++){
+	for(i = 0; i < size; i++){
 		x[off+i] = math->exp(x[off+i] - max_val);
 		sum += x[off+i];
 	}
-	for(i := 0; i < size; i++)
+	for(i = 0; i < size; i++)
 		x[off+i] /= sum;
 }
 
@@ -465,7 +465,7 @@ Transformer.forward(t: self ref Transformer, token, pos: int): array of real
 			xb_off := h * head_size;
 			for(i := 0; i < head_size; i++)
 				s.xb[xb_off + i] = 0.0;
-			for(tt := 0; tt <= pos; tt++){
+			for(tt = 0; tt <= pos; tt++){
 				v_off := loff + tt * kv_dim + kv_head_off;
 				a := s.att[att_off + tt];
 				for(i := 0; i < head_size; i++)
@@ -488,7 +488,7 @@ Transformer.forward(t: self ref Transformer, token, pos: int): array of real
 		matmul(s.hb2, s.xb, w.w3, l*dim*hidden_dim, dim, hidden_dim);
 
 		# SwiGLU
-		for(i := 0; i < hidden_dim; i++){
+		for(i = 0; i < hidden_dim; i++){
 			val := s.hb[i];
 			val *= 1.0 / (1.0 + math->exp(-val));
 			val *= s.hb2[i];
@@ -499,7 +499,7 @@ Transformer.forward(t: self ref Transformer, token, pos: int): array of real
 		matmul(s.xb, s.hb, w.w2, l*dim*hidden_dim, hidden_dim, dim);
 
 		# residual
-		for(i := 0; i < dim; i++)
+		for(i = 0; i < dim; i++)
 			s.x[i] += s.xb[i];
 	}
 
@@ -520,7 +520,7 @@ rmsnorm_off(o, x, weight: array of real, woff, size: int)
 	ss /= real size;
 	ss += 1.0e-5;
 	ss = 1.0 / math->sqrt(ss);
-	for(j := 0; j < size; j++)
+	for(j = 0; j < size; j++)
 		o[j] = weight[woff + j] * (ss * x[j]);
 }
 
@@ -754,7 +754,7 @@ Tokenizer.encode(tk: self ref Tokenizer, text: string, bos, eos: int): array of 
 		if(best_idx == -1)
 			break;
 		tokens[best_idx] = best_id;
-		for(i := best_idx + 1; i < n - 1; i++)
+		for(i = best_idx + 1; i < n - 1; i++)
 			tokens[i] = tokens[i+1];
 		n--;
 	}

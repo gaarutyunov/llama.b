@@ -29,10 +29,10 @@ init(nil: ref Draw->Context, nil: list of string)
 	for(i := 0; i < 12; i++)
 		w[i] = real (i + 1);
 	x := array[4] of real;
-	for(i := 0; i < 4; i++)
+	for(i = 0; i < 4; i++)
 		x[i] = real (i + 1);
 	o := array[3] of real;
 	llama->matmul(o, x, w, 0, 4, 3);
-	for(i := 0; i < 3; i++)
+	for(i = 0; i < 3; i++)
 		sys->print("%.6f\n", o[i]);
 }
