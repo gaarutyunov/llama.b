@@ -40,6 +40,36 @@ emurun(){
         emu -r"$INFERNO" -p heap=1024m -p main=1024m "$@"
 }
 
+# --- smoke tests: probe emu invocation variants -------------------------
+note "=== smoke: emu --help ==="
+emu -? > /dev/null 2>"$OUT/smoke.help" || true
+sed -n '1,15p' "$OUT/smoke.help" >&2 || true
+
+note "=== smoke: bare emu sh -c echo ==="
+emu -r"$INFERNO" /dis/sh.dis -c 'echo "smoke ok"' \
+        > "$OUT/smoke1.out" 2>"$OUT/smoke1.err" || note "smoke1 exit $?"
+cat "$OUT/smoke1.out" "$OUT/smoke1.err" >&2
+
+note "=== smoke: bare emu test_hello ==="
+emu -r"$INFERNO" /dis/llamatests/test_hello.dis \
+        > "$OUT/smoke2.out" 2>"$OUT/smoke2.err" || note "smoke2 exit $?"
+cat "$OUT/smoke2.out" "$OUT/smoke2.err" >&2
+
+note "=== smoke: bare emu test_hello with arg ==="
+emu -r"$INFERNO" /dis/llamatests/test_hello.dis dummyarg \
+        > "$OUT/smoke3.out" 2>"$OUT/smoke3.err" || note "smoke3 exit $?"
+cat "$OUT/smoke3.out" "$OUT/smoke3.err" >&2
+
+note "=== smoke: emu test_hello + heap pool ==="
+emu -r"$INFERNO" -p heap=64m /dis/llamatests/test_hello.dis \
+        > "$OUT/smoke4.out" 2>"$OUT/smoke4.err" || note "smoke4 exit $?"
+cat "$OUT/smoke4.out" "$OUT/smoke4.err" >&2
+
+note "=== smoke: emu test_hello via stdin redirect ==="
+emu -r"$INFERNO" /dis/llamatests/test_hello.dis < /dev/null \
+        > "$OUT/smoke5.out" 2>"$OUT/smoke5.err" || note "smoke5 exit $?"
+cat "$OUT/smoke5.out" "$OUT/smoke5.err" >&2
+
 # component test: limbo dis prints values, C reference prints expected
 # values, diff -u catches any mismatch.  Always echo emu's stderr so
 # diagnostic prints from the .b are visible regardless of pass/fail.
@@ -119,22 +149,34 @@ fi
 if [ -f "$INFERNO/data/stories15M.bin" ] \
    && [ -f "$INFERNO/data/tokenizer.bin" ] \
    && [ -x "$HERE/tests/reference/karpathy_run" ]; then
+        rc=0
         emurun /dis/run.dis /data/stories15M.bin -z /data/tokenizer.bin \
-                -t 0.0 -s 42 -n 20 > "$OUT/generation.actual.raw" 2>/dev/null \
-                || { note "FAIL generation (emu)"; FAIL=$((FAIL + 1)); }
-        "$HERE/tests/reference/karpathy_run" "$INFERNO/data/stories15M.bin" \
-                -z "$INFERNO/data/tokenizer.bin" -t 0.0 -s 42 -n 20 \
-                > "$OUT/generation.expected.raw" 2>/dev/null
-        # strip the trailing "achieved tok/s" line which varies; keep only
-        # the generated text on the first line.
-        head -n 1 "$OUT/generation.actual.raw"   > "$OUT/generation.actual"
-        head -n 1 "$OUT/generation.expected.raw" > "$OUT/generation.expected"
-        if diff -u "$OUT/generation.expected" "$OUT/generation.actual"; then
-                note "PASS generation"
-                PASS=$((PASS + 1))
-        else
-                note "FAIL generation"
+                -t 0.0 -s 42 -n 20 \
+                > "$OUT/generation.actual.raw" 2>"$OUT/generation.err" || rc=$?
+        if [ -s "$OUT/generation.err" ]; then
+                note "--- generation stderr ---"
+                cat "$OUT/generation.err" >&2
+                note "--- end generation stderr ---"
+        fi
+        if [ $rc -ne 0 ]; then
+                note "FAIL generation (emu exit $rc)"
                 FAIL=$((FAIL + 1))
+        else
+                "$HERE/tests/reference/karpathy_run" \
+                        "$INFERNO/data/stories15M.bin" \
+                        -z "$INFERNO/data/tokenizer.bin" -t 0.0 -s 42 -n 20 \
+                        > "$OUT/generation.expected.raw" 2>/dev/null
+                # strip the trailing "achieved tok/s" line which varies; keep
+                # only the generated text on the first line.
+                head -n 1 "$OUT/generation.actual.raw"   > "$OUT/generation.actual"
+                head -n 1 "$OUT/generation.expected.raw" > "$OUT/generation.expected"
+                if diff -u "$OUT/generation.expected" "$OUT/generation.actual"; then
+                        note "PASS generation"
+                        PASS=$((PASS + 1))
+                else
+                        note "FAIL generation (output differs)"
+                        FAIL=$((FAIL + 1))
+                fi
         fi
 else
         note "SKIP generation (need stories15M.bin, tokenizer.bin and karpathy_run)"
