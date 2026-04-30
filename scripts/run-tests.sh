@@ -40,39 +40,21 @@ emurun(){
         emu -r"$INFERNO" -p heap=1024m -p main=1024m "$@"
 }
 
-# --- smoke tests: probe emu invocation variants -------------------------
-note "=== smoke: emu --help ==="
-emu -? > /dev/null 2>"$OUT/smoke.help" || true
-sed -n '1,15p' "$OUT/smoke.help" >&2 || true
-
-note "=== smoke: bare emu sh -c echo ==="
-emu -r"$INFERNO" /dis/sh.dis -c 'echo "smoke ok"' \
-        > "$OUT/smoke1.out" 2>"$OUT/smoke1.err" || note "smoke1 exit $?"
-cat "$OUT/smoke1.out" "$OUT/smoke1.err" >&2
-
-note "=== smoke: bare emu test_hello ==="
-emu -r"$INFERNO" /dis/llamatests/test_hello.dis \
-        > "$OUT/smoke2.out" 2>"$OUT/smoke2.err" || note "smoke2 exit $?"
-cat "$OUT/smoke2.out" "$OUT/smoke2.err" >&2
-
-note "=== smoke: bare emu test_hello with arg ==="
-emu -r"$INFERNO" /dis/llamatests/test_hello.dis dummyarg \
-        > "$OUT/smoke3.out" 2>"$OUT/smoke3.err" || note "smoke3 exit $?"
-cat "$OUT/smoke3.out" "$OUT/smoke3.err" >&2
-
-note "=== smoke: emu test_hello + heap pool ==="
-emu -r"$INFERNO" -p heap=64m /dis/llamatests/test_hello.dis \
-        > "$OUT/smoke4.out" 2>"$OUT/smoke4.err" || note "smoke4 exit $?"
-cat "$OUT/smoke4.out" "$OUT/smoke4.err" >&2
-
-note "=== smoke: emu test_hello via stdin redirect ==="
-emu -r"$INFERNO" /dis/llamatests/test_hello.dis < /dev/null \
-        > "$OUT/smoke5.out" 2>"$OUT/smoke5.err" || note "smoke5 exit $?"
-cat "$OUT/smoke5.out" "$OUT/smoke5.err" >&2
+# Smoke probe: verify emu can run a trivial program. Under i386-on-amd64
+# qemu-user emulation, emu reliably produces correct output but then gets
+# SIGKILL'd at exit (exit code 137).  We accept that downstream.
+note "smoke: emu test_hello"
+emu -r"$INFERNO" /dis/llamatests/test_hello.dis > "$OUT/smoke.out" 2>&1 || true
+cat "$OUT/smoke.out" >&2
 
 # component test: limbo dis prints values, C reference prints expected
-# values, diff -u catches any mismatch.  Always echo emu's stderr so
-# diagnostic prints from the .b are visible regardless of pass/fail.
+# values, diff -u catches any mismatch.
+#
+# emu under i386-on-amd64 qemu-user emulation reliably gets SIGKILL'd at
+# *exit* time even after the limbo program has already finished and
+# flushed stdout — see the smoke probes above.  Treat exit code 137 as
+# success as long as stdout was produced; only emu exits with codes other
+# than 0 or 137 (or empty stdout) get treated as a real failure.
 component(){
         name=$1; dis=$2; ref=$3; shift 3
         expected="$OUT/$name.expected"
@@ -84,8 +66,13 @@ component(){
                 cat "$OUT/$name.err" >&2
                 note "--- end $name stderr ---"
         fi
-        if [ $rc -ne 0 ]; then
+        if [ $rc -ne 0 ] && [ $rc -ne 137 ]; then
                 note "FAIL $name (emu exit $rc)"
+                FAIL=$((FAIL + 1))
+                return
+        fi
+        if [ ! -s "$actual" ]; then
+                note "FAIL $name (no stdout, emu exit $rc)"
                 FAIL=$((FAIL + 1))
                 return
         fi
@@ -100,14 +87,8 @@ component(){
                         FAIL=$((FAIL + 1))
                 fi
         else
-                # no reference: just check there is some stdout
-                if [ -s "$actual" ]; then
-                        note "PASS $name"
-                        PASS=$((PASS + 1))
-                else
-                        note "FAIL $name (no output)"
-                        FAIL=$((FAIL + 1))
-                fi
+                note "PASS $name"
+                PASS=$((PASS + 1))
         fi
 }
 
@@ -124,19 +105,28 @@ component rng     /dis/llamatests/test_rng.dis     "$HERE/tests/reference/ref_rn
 # --- model-loading test (needs the checkpoint) ---------------------------
 if [ -f "$INFERNO/data/stories15M.bin" ]; then
         # Limbo test takes the inferno-namespace path /data/stories15M.bin;
-        # the C reference takes the host filesystem path.
+        # the C reference takes the host filesystem path.  See note on
+        # ignoring exit 137 above.
+        rc=0
         emurun /dis/llamatests/test_model_loading.dis /data/stories15M.bin \
-                > "$OUT/model_loading.actual" 2>"$OUT/model_loading.err" || true
-        "$HERE/tests/reference/ref_model_loading" \
-                "$INFERNO/data/stories15M.bin" > "$OUT/model_loading.expected"
-        if diff -u "$OUT/model_loading.expected" "$OUT/model_loading.actual" \
-                > "$OUT/model_loading.diff"; then
-                note "PASS model_loading"
-                PASS=$((PASS + 1))
-        else
-                note "FAIL model_loading"
-                cat "$OUT/model_loading.diff" >&2
+                > "$OUT/model_loading.actual" 2>"$OUT/model_loading.err" || rc=$?
+        if [ $rc -ne 0 ] && [ $rc -ne 137 ]; then
+                note "FAIL model_loading (emu exit $rc)"
                 FAIL=$((FAIL + 1))
+        else
+                "$HERE/tests/reference/ref_model_loading" \
+                        "$INFERNO/data/stories15M.bin" \
+                        > "$OUT/model_loading.expected"
+                if diff -u "$OUT/model_loading.expected" \
+                        "$OUT/model_loading.actual" \
+                        > "$OUT/model_loading.diff"; then
+                        note "PASS model_loading"
+                        PASS=$((PASS + 1))
+                else
+                        note "FAIL model_loading"
+                        cat "$OUT/model_loading.diff" >&2
+                        FAIL=$((FAIL + 1))
+                fi
         fi
 else
         note "SKIP model_loading (no $INFERNO/data/stories15M.bin)"
@@ -158,7 +148,7 @@ if [ -f "$INFERNO/data/stories15M.bin" ] \
                 cat "$OUT/generation.err" >&2
                 note "--- end generation stderr ---"
         fi
-        if [ $rc -ne 0 ]; then
+        if [ $rc -ne 0 ] && [ $rc -ne 137 ]; then
                 note "FAIL generation (emu exit $rc)"
                 FAIL=$((FAIL + 1))
         else
