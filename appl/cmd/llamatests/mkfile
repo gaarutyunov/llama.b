@@ -1,6 +1,8 @@
 <../../../mkconfig
 
 TARG=\
+	test_hello.dis\
+	test_load_llama.dis\
 	test_rmsnorm.dis\
 	test_softmax.dis\
 	test_matmul.dis\

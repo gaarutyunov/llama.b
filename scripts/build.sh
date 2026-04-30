@@ -23,7 +23,7 @@ echo "compiling library: appl/lib/llama.b"
 echo "compiling cmd: appl/cmd/run.b"
 ( cd "$INFERNO/dis" && $LIMBO "$HERE/appl/cmd/run.b" )
 
-for t in test_rmsnorm test_softmax test_matmul test_rng test_model_loading; do
+for t in test_hello test_load_llama test_rmsnorm test_softmax test_matmul test_rng test_model_loading; do
         echo "compiling test: $t"
         ( cd "$INFERNO/dis/llamatests" && $LIMBO "$HERE/appl/cmd/llamatests/$t.b" )
 done

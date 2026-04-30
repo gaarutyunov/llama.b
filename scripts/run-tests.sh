@@ -41,27 +41,49 @@ emurun(){
 }
 
 # component test: limbo dis prints values, C reference prints expected
-# values, diff -u catches any mismatch.
+# values, diff -u catches any mismatch.  Always echo emu's stderr so
+# diagnostic prints from the .b are visible regardless of pass/fail.
 component(){
         name=$1; dis=$2; ref=$3; shift 3
         expected="$OUT/$name.expected"
         actual="$OUT/$name.actual"
-        if ! emurun "$dis" "$@" > "$actual" 2>"$OUT/$name.err"; then
-                note "FAIL $name (emu failed)"
+        rc=0
+        emurun "$dis" "$@" > "$actual" 2>"$OUT/$name.err" || rc=$?
+        if [ -s "$OUT/$name.err" ]; then
+                note "--- $name stderr ---"
                 cat "$OUT/$name.err" >&2
+                note "--- end $name stderr ---"
+        fi
+        if [ $rc -ne 0 ]; then
+                note "FAIL $name (emu exit $rc)"
                 FAIL=$((FAIL + 1))
                 return
         fi
-        "$ref" "$@" > "$expected"
-        if diff -u "$expected" "$actual" > "$OUT/$name.diff"; then
-                note "PASS $name"
-                PASS=$((PASS + 1))
+        if [ -n "$ref" ]; then
+                "$ref" "$@" > "$expected"
+                if diff -u "$expected" "$actual" > "$OUT/$name.diff"; then
+                        note "PASS $name"
+                        PASS=$((PASS + 1))
+                else
+                        note "FAIL $name"
+                        cat "$OUT/$name.diff" >&2
+                        FAIL=$((FAIL + 1))
+                fi
         else
-                note "FAIL $name"
-                cat "$OUT/$name.diff" >&2
-                FAIL=$((FAIL + 1))
+                # no reference: just check there is some stdout
+                if [ -s "$actual" ]; then
+                        note "PASS $name"
+                        PASS=$((PASS + 1))
+                else
+                        note "FAIL $name (no output)"
+                        FAIL=$((FAIL + 1))
+                fi
         fi
 }
+
+# --- diagnostic / progress tests ----------------------------------------
+component hello       /dis/llamatests/test_hello.dis       ""
+component load_llama  /dis/llamatests/test_load_llama.dis  ""
 
 # --- pure component tests ------------------------------------------------
 component rmsnorm /dis/llamatests/test_rmsnorm.dis "$HERE/tests/reference/ref_rmsnorm"
