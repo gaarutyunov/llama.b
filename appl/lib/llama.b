@@ -468,8 +468,8 @@ Transformer.forward(t: self ref Transformer, token, pos: int): array of real
 			for(tt = 0; tt <= pos; tt++){
 				v_off := loff + tt * kv_dim + kv_head_off;
 				a := s.att[att_off + tt];
-				for(i := 0; i < head_size; i++)
-					s.xb[xb_off + i] += a * s.value_cache[v_off + i];
+				for(iv := 0; iv < head_size; iv++)
+					s.xb[xb_off + iv] += a * s.value_cache[v_off + iv];
 			}
 		}
 

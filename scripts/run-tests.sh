@@ -33,7 +33,11 @@ if [ -d "$DATA" ]; then
 fi
 
 emurun(){
-        emu -r"$INFERNO" "$@"
+        # default heap pool max is 32 MiB, far too small for stories15M
+        # (needs ~250 MiB after widening f32 to limbo's f64 reals).
+        # Bump it; the small unit tests don't care but the harness uses
+        # one helper to keep behaviour uniform.
+        emu -r"$INFERNO" -p heap=1024m -p main=1024m "$@"
 }
 
 # component test: limbo dis prints values, C reference prints expected
