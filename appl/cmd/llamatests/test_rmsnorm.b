@@ -13,8 +13,9 @@ TestRmsnorm: module
 	init: fn(ctxt: ref Draw->Context, argv: list of string);
 };
 
-init(nil: ref Draw->Context, nil: list of string)
+init(nil: ref Draw->Context, argv: list of string)
 {
+	argv = nil;
 	sys = load Sys Sys->PATH;
 	llama = load Llama Llama->PATH;
 	if(llama == nil){
