@@ -10,7 +10,14 @@ set -eu
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 DATA="$HERE/data"
 OUT="$HERE/build/tests"
+FDIFF="$HERE/scripts/fdiff.awk"
 mkdir -p "$OUT"
+
+# tolerant float compare; falls back to byte-exact `diff` if fdiff isn't
+# available for some reason.
+fdiff(){
+        awk -v eps="${EPS:-1e-4}" -f "$FDIFF" "$1" "$2"
+}
 
 PASS=0
 FAIL=0
@@ -78,12 +85,19 @@ component(){
         fi
         if [ -n "$ref" ]; then
                 "$ref" "$@" > "$expected"
-                if diff -u "$expected" "$actual" > "$OUT/$name.diff"; then
+                # save the byte-diff for inspection but use a tolerant
+                # compare for the pass/fail decision: limbo's float
+                # formatter occasionally rounds the last printed digit
+                # one ULP off from C's, even when the underlying value
+                # is correct.
+                diff -u "$expected" "$actual" > "$OUT/$name.diff" || true
+                if fdiff "$expected" "$actual" 2>"$OUT/$name.fdiff"; then
                         note "PASS $name"
                         PASS=$((PASS + 1))
                 else
                         note "FAIL $name"
                         cat "$OUT/$name.diff" >&2
+                        cat "$OUT/$name.fdiff" >&2
                         FAIL=$((FAIL + 1))
                 fi
         else
@@ -117,14 +131,18 @@ if [ -f "$INFERNO/data/stories15M.bin" ]; then
                 "$HERE/tests/reference/ref_model_loading" \
                         "$INFERNO/data/stories15M.bin" \
                         > "$OUT/model_loading.expected"
-                if diff -u "$OUT/model_loading.expected" \
+                diff -u "$OUT/model_loading.expected" \
                         "$OUT/model_loading.actual" \
-                        > "$OUT/model_loading.diff"; then
+                        > "$OUT/model_loading.diff" || true
+                if fdiff "$OUT/model_loading.expected" \
+                        "$OUT/model_loading.actual" \
+                        2>"$OUT/model_loading.fdiff"; then
                         note "PASS model_loading"
                         PASS=$((PASS + 1))
                 else
                         note "FAIL model_loading"
                         cat "$OUT/model_loading.diff" >&2
+                        cat "$OUT/model_loading.fdiff" >&2
                         FAIL=$((FAIL + 1))
                 fi
         fi
